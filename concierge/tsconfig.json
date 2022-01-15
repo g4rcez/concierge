@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "commonjs",
+    "lib": [
+      "ESNext",
+      "DOM"
+    ],
+    "strictNullChecks": true,
+    "declarationMap": false,
+    "inlineSourceMap": false,
+    "allowSyntheticDefaultImports": true,
+    "useUnknownInCatchVariables": false,
+    "downlevelIteration": true,
+    "strictFunctionTypes": true,
+    "allowJs": false,
+    "outDir": "./build",
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
+    "strict": true,
+    "alwaysStrict": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitAny": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "sourceMap": false,
+    "strictPropertyInitialization": true,
+  },
+  "include": [
+    "src"
+  ]
+}
