@@ -1,0 +1,9 @@
+{
+  "name": "microfrontends",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "asdf:build": "yarn --cwd ./asdf "
+  }
+}
