@@ -1,9 +1,10 @@
 import { Request, Response, Router } from "express";
 import { join } from "path";
-import { Optimization, OptimizedJS } from "../frontend/optimization";
+import { Optimization, OptimizedJS } from "../frontend/optimization/optimization";
 import { Storage } from "../storage";
-import { Strings } from "../strings";
-import { Http } from "./http";
+import { Strings } from "../lib/strings";
+import { Middleware } from "../global";
+import { Http } from "../lib/http";
 
 export enum ApplicationType {
   orchestrator = "orchestrator",
@@ -92,21 +93,28 @@ export class Application {
     return { content: entry.content, type: this.app.type };
   };
 
-  public serve = async (router: Router, newEntryPoint: string) => {
+  public serve = async (
+    router: Router,
+    staticMiddleware: Middleware[],
+    entrypointMiddleware: (req: Request, res: Response, nonce: string) => Promise<string>
+  ) => {
     this.map.forEach((file, key) => {
       if (key === rootAlias) {
         const path = `/${this.app.route}((/[A-Za-z0-9_-]+/?)+|/?)`;
-        const sendEntrypoint = (req: Request, res: Response) => {
+        const sendEntrypoint = async (req: Request, res: Response) => {
+          const nonce = Strings.nonce();
+          const app = await entrypointMiddleware(req, res, nonce);
           res.contentType(file.contentType);
-          return res.send(newEntryPoint);
+          return res.send(app);
         };
         router.get(`/${this.app.route}((/[A-Za-z0-9_-]+/?)+|/)`, sendEntrypoint);
         router.all(path, sendEntrypoint);
       } else {
         const path = `/${this.baseUrl(file.path)}`;
-        router.get(path, (_, res) => res.contentType(file.contentType).send(file.content));
-        router.all(path, (_, res) => res.sendStatus(Http.StatusCode.MethodNotAllowed));
+        router.get(path, ...staticMiddleware, (_, res) => res.contentType(file.contentType).send(file.content));
+        router.all(path, ...staticMiddleware, (_, res) => res.sendStatus(Http.StatusMethodNotAllowed));
       }
     });
+    console.log(`${this.app.origin}@${this.app.version} - Starts at /${this.app.route}`);
   };
 }
