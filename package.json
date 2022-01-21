@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
-  "scripts": {
-    "asdf:build": "yarn --cwd ./asdf "
+  "dependencies": {
+    "csurf": "1.11.0",
+    "http-proxy": "1.18.1"
+  },
+  "devDependencies": {
+    "@types/csurf": "1.11.2",
+    "@types/http-proxy": "1.17.8"
   }
 }
