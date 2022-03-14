@@ -9,10 +9,10 @@ export namespace Security {
   export const scripts = (nonce: string, domain: string): HTMLElement[] => {
     const params: CSP.Params = { nonce, domain };
     return [
-      TemplateEngine.parse(Strings.html`<base href="${domain}" />`),
-      TemplateEngine.parse(Strings.html`<meta http-equiv="${CSP.header}" content="${CSP.html(params)}" />`),
+      TemplateEngine.dom(Strings.html`<base href="${domain}" />`),
+      TemplateEngine.dom(Strings.html`<meta http-equiv="${CSP.header}" content="${CSP.html(params)}" />`),
       // for MaterialUI/styled-components
-      TemplateEngine.parse(Strings.html`<meta property="csp-nonce" content="${nonce}" />`),
+      TemplateEngine.dom(Strings.html`<meta property="csp-nonce" content="${nonce}" />`)
     ];
   };
 
@@ -25,12 +25,12 @@ export namespace Security {
     res.setHeader("Access-Control-Allow-Origin", Http.getDomain(req));
     res.setHeader("Access-Control-Allow-Headers", "X-Requested-With,content-type");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
-    res.setHeader("Strict-Transport-Security", `max-age=31536000; includeSubDomains; preload`);
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
     return next();
   };
 
-  export const injectAppHeaders = (nonce: string, req: Request, res: Response) => {
-    res.setHeader("Cache-control", "no-cache");
+  export const injectAppHeaders = (req: Request, res: Response, nonce: string) => {
+    res.setHeader("Cache-control", Http.NoCache);
     res.setHeader("Content-Type", "text/html");
     res.setHeader(
       "Permissions-Policy",
@@ -107,7 +107,7 @@ namespace CSP {
     styleSrcElementWithNonce,
     legacyBlockAllMixedContent,
     upgradeInsecureRequests,
-    workerSrc,
+    workerSrc
   ];
 
   const joinRules = (rules: CspRule[], params: Params) => rules.map((rule) => rule(params)).join(";");

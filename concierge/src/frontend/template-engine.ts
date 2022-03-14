@@ -6,7 +6,7 @@ export namespace TemplateEngine {
     value: string;
   };
 
-  export const parse = (html: string): HTMLElement => domParser(html);
+  export const dom = (html: string): HTMLElement => domParser(html);
 
   export const appendHead = (html: HTMLElement, tags: HTMLElement[]) => {
     const head = html.querySelector("head")!;
@@ -16,7 +16,8 @@ export namespace TemplateEngine {
 
   export const prependHead = (html: HTMLElement, tags: HTMLElement[]) => {
     const head = html.querySelector("head")!;
-    head.innerHTML = `${tags.map((tag) => head.appendChild(tag)).join("")}${head.innerHTML}`;
+    const innerHeadHtml = head.innerHTML;
+    head.innerHTML = `${tags.map((tag) => head.appendChild(tag)).join("")}${innerHeadHtml}`;
     return html;
   };
 

@@ -1,14 +1,18 @@
 import { Router } from "express";
 import Semver from "semver";
-import { OptimizedJS, ViteRollup } from "../frontend/optimization/optimization";
-import { Storage } from "../storage";
-import { Application, ApplicationType } from "./applications";
-import Crypto from "crypto";
-import { TemplateEngine } from "../frontend/template-engine";
 import { Monitoring } from "../frontend/monitoring";
+import { OptimizedJS } from "../frontend/optimization/optimization";
 import { Security } from "../frontend/security";
-import csurf from "csurf";
+import { TemplateEngine } from "../frontend/template-engine";
 import { Http } from "../lib/http";
+import { Storage } from "../storage";
+import { Application, ApplicationType, Bundler } from "./applications";
+
+const bundlers = {
+  [Bundler.vite]: () => import("../frontend/optimization/vite"),
+  [Bundler.webpack]: () => import("../frontend/optimization/webpack"),
+  [Bundler.viteRollup]: () => import("../frontend/optimization/vite")
+};
 
 export namespace Concierge {
   export const init = async () => {
@@ -21,19 +25,9 @@ export namespace Concierge {
   const validate = (app: Application) => (app.disabled ? false : Semver.valid(app.version));
 
   const registerDependencies = async (deps: OptimizedJS, router: Router) => {
-    deps.forEach((file) => {
-      const hash = Crypto.createHash("sha256").update(file.content).digest("hex");
-      router.get(file.fork, (req, res) => {
-        if (req.headers.integrity === hash) {
-          return res.sendStatus(304);
-        }
-        return res
-          .setHeader("Integrity", hash)
-          .setHeader("Cache-Control", "public,max-age=31536000,immutable")
-          .contentType(file.contentType)
-          .send(file.content);
-      });
-    });
+    deps.forEach((file) =>
+      router.get(file.fork, (_, res) => res.setHeader("Cache-Control", Http.ImmutableCache).contentType(file.contentType).send(file.content))
+    );
   };
 
   export const run = async (apps: Application[], storage: Storage.Interface) => {
@@ -42,8 +36,9 @@ export namespace Concierge {
     await Promise.all(
       availableApps.map(async (app) => {
         await app.load(storage);
-
-        const parser = new ViteRollup(app);
+        const bundlerName = app.app.bundler;
+        const ParserImpl = await bundlers[bundlerName]();
+        const parser = new ParserImpl.default(app);
         const commonDependencies = await parser.optimizeJsVendor();
 
         await registerDependencies(commonDependencies, router);
@@ -54,17 +49,17 @@ export namespace Concierge {
         const staticMiddleware = [Security.commonFilesMiddleware];
 
         if (entryPoint.type === ApplicationType.orchestrator) {
-          const html = await parser.replaceHtml(entryPoint.content);
-          const dom = TemplateEngine.parse(html);
-
-          await app.serve(router, staticMiddleware, async (req, res, nonce) => {
-            TemplateEngine.prependHead(dom, [...Monitoring.scripts(app), ...Security.scripts(nonce, Http.getDomain(req))]);
-            Security.injectAppHeaders(nonce, req, res);
+          return app.serve(router, staticMiddleware, async (req, res, nonce) => {
+            const domain = Http.getDomain(req);
+            const htmlString = await parser.replaceHtml(entryPoint.content);
+            const dom = TemplateEngine.dom(htmlString);
+            const headers = Monitoring.scripts(app).concat(Security.scripts(nonce, domain));
+            TemplateEngine.prependHead(dom, headers);
+            Security.injectAppHeaders(req, res, nonce);
             return TemplateEngine.render(dom);
           });
-          return;
         }
-        await app.serve(router, staticMiddleware, async () => entryPoint.content);
+        return app.serve(router, staticMiddleware, async () => entryPoint.content);
       })
     );
     return router;

@@ -2,15 +2,15 @@ import { JsDependency, Optimization } from "./optimization";
 import HtmlParser from "node-html-parser";
 import Path from "path";
 
-export default class ViteRollup extends Optimization {
+export default class Webpack extends Optimization {
   public replaceHtml = async (html: string): Promise<string> => {
     const dom = HtmlParser(html);
-    const linkModules = dom.querySelectorAll("link[rel=modulepreload]");
+    const linkModules = dom.querySelectorAll("script[src]");
     linkModules.forEach((link) => {
-      const linkPreModule = link.getAttribute("href")!;
-      const vendor = this.jsVendor(Path.basename(linkPreModule));
-      link.setAttribute("href", vendor);
+      link.setAttribute("rel", "prefetch");
+      link.setAttribute("defer", "true");
     });
+
     return dom.toString();
   };
 

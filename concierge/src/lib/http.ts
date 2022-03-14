@@ -76,5 +76,8 @@ export namespace Http {
   export const StatusNotExtended = 510;
   export const StatusNetworkAuthenticationRequired = 511;
 
+  export const ImmutableCache = "public,max-age=31536000,immutable";
+  export const NoCache = "no-cache";
+
   export const getDomain = (req: Request) => (Environment.prod ? `https://${req.hostname}` : `${req.protocol}://${req.hostname}`);
 }

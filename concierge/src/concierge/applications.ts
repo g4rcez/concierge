@@ -8,16 +8,18 @@ import { Http } from "../lib/http";
 
 export enum ApplicationType {
   orchestrator = "orchestrator",
-  app = "app",
+  app = "app"
 }
 
 enum EntrypointType {
   orchestrator = "/index.html",
-  app = "/index.js",
+  app = "/index.js"
 }
 
-enum Bundler {
-  viteRollup = "viteRollup",
+export enum Bundler {
+  vite = "vite",
+  webpack = "webpack",
+  viteRollup = "viteRollup"
 }
 
 export type FrontendConfig = {
@@ -52,11 +54,9 @@ export class Application {
     return files;
   };
 
-  public removeFiles = (files: string[]) => {
-    files.forEach((file) => this.map.delete(file));
-  };
+  public removeFiles = (files: string[]) => files.forEach((file) => this.map.delete(file));
 
-  public load = async (storage: Storage.Interface) => {
+  public load = async (storage: Storage.Interface): Promise<void> => {
     const allFiles = await storage.listAllFiles(this.app);
     const base = Strings.url(this.app.route, this.app.version);
     await Promise.all(
@@ -64,15 +64,14 @@ export class Application {
         const [, path] = name.split(base);
         const file = await storage.file(path, this.app);
         const mappedFile = { content: file.content, contentType: file.contentType, path };
-        if (this.app.type === ApplicationType.orchestrator && path === EntrypointType.orchestrator) {
-          this.map.set(rootAlias, mappedFile);
-          return;
+        const isOrchestrator = this.app.type === ApplicationType.orchestrator && path === EntrypointType.orchestrator;
+        if (isOrchestrator) {
+          return void this.map.set(rootAlias, mappedFile);
         }
         if (this.app.type === ApplicationType.app && path === EntrypointType.app) {
-          this.map.set(rootAlias, mappedFile);
-          return;
+          return void this.map.set(rootAlias, mappedFile);
         }
-        this.map.set(path, mappedFile);
+        return void this.map.set(path, mappedFile);
       })
     );
   };
@@ -93,27 +92,21 @@ export class Application {
     return { content: entry.content, type: this.app.type };
   };
 
-  public serve = async (
-    router: Router,
-    staticMiddleware: Middleware[],
-    entrypointMiddleware: (req: Request, res: Response, nonce: string) => Promise<string>
-  ) => {
+  public serve = async (router: Router, statics: Middleware[], entrypoint: (req: Request, res: Response, nonce: string) => Promise<string>) => {
     this.map.forEach((file, key) => {
       if (key === rootAlias) {
         const path = `/${this.app.route}((/[A-Za-z0-9_-]+/?)+|/?)`;
         const sendEntrypoint = async (req: Request, res: Response) => {
           const nonce = Strings.nonce();
-          const app = await entrypointMiddleware(req, res, nonce);
-          res.contentType(file.contentType);
-          return res.send(app);
+          const app = await entrypoint(req, res, nonce);
+          return res.contentType(file.contentType).send(app);
         };
-        router.get(`/${this.app.route}((/[A-Za-z0-9_-]+/?)+|/)`, sendEntrypoint);
-        router.all(path, sendEntrypoint);
-      } else {
-        const path = `/${this.baseUrl(file.path)}`;
-        router.get(path, ...staticMiddleware, (_, res) => res.contentType(file.contentType).send(file.content));
-        router.all(path, ...staticMiddleware, (_, res) => res.sendStatus(Http.StatusMethodNotAllowed));
+        return void router.get(path, sendEntrypoint).all(path, sendEntrypoint);
       }
+      const path = `/${this.baseUrl(file.path)}`;
+      return void router
+        .get(path, ...statics, (_, res) => res.setHeader("Cache-Control", Http.ImmutableCache).contentType(file.contentType).send(file.content))
+        .all(path, ...statics, (_, res) => res.sendStatus(Http.StatusMethodNotAllowed));
     });
     console.log(`${this.app.origin}@${this.app.version} - Starts at /${this.app.route}`);
   };
